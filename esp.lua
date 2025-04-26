@@ -7,16 +7,18 @@ local function createESP(player)
     local character = player.Character
     if not character then return end
 
+    -- Create the ESP part and position it slightly above the character
     local espBox = Instance.new("Part")
     espBox.Size = character:FindFirstChild("HumanoidRootPart").Size + Vector3.new(1, 2, 1)
-    espBox.Position = character:FindFirstChild("HumanoidRootPart").Position + Vector3.new(0, 3, 0)  -- Adjust to position above the player
+    espBox.Position = character:FindFirstChild("HumanoidRootPart").Position + Vector3.new(0, 3, 0)
     espBox.Anchored = true
     espBox.CanCollide = false
     espBox.Material = Enum.Material.SmoothPlastic
     espBox.BrickColor = BrickColor.new("Bright red")
     espBox.Transparency = 0.5
-    espBox.Parent = workspace -- Keep the box in the workspace
+    espBox.Parent = workspace
 
+    -- Create the BillboardGui for the name label
     local billboard = Instance.new("BillboardGui")
     billboard.Parent = espBox
     billboard.Adornee = espBox
@@ -31,9 +33,11 @@ local function createESP(player)
     nameLabel.BackgroundTransparency = 1
 end
 
+-- Update ESP for each player every frame
 RunService.Heartbeat:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
+            -- Only create the ESP if it doesn't already exist
             if not player.Character:FindFirstChild("ESP_Box") then
                 createESP(player)
             end
