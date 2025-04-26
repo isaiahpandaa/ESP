@@ -1,32 +1,37 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Teams = game:GetService("Teams") -- Added team check
 
 -- Settings
-local LINE_LENGTH = 30  -- Shorter for volleyball
+local LINE_LENGTH = 30
 local LINE_THICKNESS = 0.15
-local LINE_COLOR = Color3.fromRGB(0, 255, 100) -- Light green
+local LINE_COLOR = Color3.fromRGB(255, 50, 50) -- Red for enemies
 local LINE_TRANSPARENCY = 0.5
-local UPDATE_RATE = 0.1 -- Smoother updates
+local UPDATE_RATE = 0.1
 
 -- Store lines per player
 local lineCache = {}
 
+local function isOpponent(player)
+    if not LocalPlayer.Team then return true end -- If no teams, show all
+    return player.Team ~= LocalPlayer.Team
+end
+
 local function createBeam(player)
+    local character = player.Character
+    if not character then return nil end
+    
+    local head = character:FindFirstChild("Head")
+    if not head then return nil end
+
     local attachment0 = Instance.new("Attachment")
     local attachment1 = Instance.new("Attachment")
     local beam = Instance.new("Beam")
 
-    -- Parent attachments to the player's head
-    local character = player.Character
-    if not character then return end
-    local head = character:FindFirstChild("Head")
-    if not head then return end
-
     attachment0.Parent = head
     attachment1.Parent = head
 
-    -- Configure Beam
     beam.Attachment0 = attachment0
     beam.Attachment1 = attachment1
     beam.Width0 = LINE_THICKNESS
@@ -36,25 +41,35 @@ local function createBeam(player)
     beam.LightEmission = 1
     beam.Parent = head
 
-    return {beam = beam, attachment0 = attachment0, attachment1 = attachment1}
+    return {
+        beam = beam,
+        attachment0 = attachment0,
+        attachment1 = attachment1
+    }
 end
 
 local function updateBeam(player, beamData)
+    if not isOpponent(player) then
+        beamData.beam.Enabled = false
+        return
+    end
+
     local character = player.Character
     if not character then return end
+    
     local head = character:FindFirstChild("Head")
     if not head then return end
 
+    beamData.beam.Enabled = true
     local lookDir = head.CFrame.LookVector
-    local startPos = head.Position + (lookDir * 1) -- Start slightly in front of head
+    local startPos = head.Position + (lookDir * 1)
     local endPos = startPos + (lookDir * LINE_LENGTH)
 
-    -- Update beam positions (smooth & stable)
     beamData.attachment0.WorldPosition = startPos
     beamData.attachment1.WorldPosition = endPos
 end
 
--- Main loop (optimized for stability)
+-- Main loop
 RunService.Heartbeat:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
@@ -69,12 +84,21 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Cleanup when players leave
+-- Cleanup
 Players.PlayerRemoving:Connect(function(player)
     if lineCache[player] then
         lineCache[player].beam:Destroy()
         lineCache[player].attachment0:Destroy()
         lineCache[player].attachment1:Destroy()
         lineCache[player] = nil
+    end
+end)
+
+-- Handle team changes
+LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+    for player, beamData in pairs(lineCache) do
+        if player and beamData then
+            updateBeam(player, beamData)
+        end
     end
 end)
