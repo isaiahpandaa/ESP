@@ -1,88 +1,96 @@
+-- Elemental Power Tycoon OP Auto-Farm Script
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
 
 -- Auto-Farm Settings
-local AUTO_STEAL = true
-local AUTO_UPGRADE = true
-local STEAL_DELAY = 0.5 -- Seconds between steals
-local TARGET_RICHEST = true -- Steal from richest players first
+local AUTO_FARM = true
+local AUTO_REBIRTH = true
+local AUTO_BUY_UPGRADES = true
+local FARM_SPEED = 0.5 -- Seconds between clicks (lower = faster)
+local REBIRTH_AT = 10 -- Rebirth when you reach this level
 
--- Time Stealing Function
-local function stealTime()
-    if not LocalPlayer.Character then return end
-    
-    local target
-    if TARGET_RICHEST then
-        -- Find player with most time
-        local richestPlayer, maxTime = nil, 0
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                local time = player:FindFirstChild("Time") and player.Time.Value or 0
-                if time > maxTime then
-                    richestPlayer = player
-                    maxTime = time
+-- Find your Tycoon
+local function getYourTycoon()
+    for _, tycoon in pairs(Workspace.Tycoons:GetChildren()) do
+        if tycoon:FindFirstChild("Owner") and tycoon.Owner.Value == LocalPlayer then
+            return tycoon
+        end
+    end
+end
+
+-- Auto-Click Function
+local function autoClick()
+    while AUTO_FARM and task.wait(FARM_SPEED) do
+        local tycoon = getYourTycoon()
+        if tycoon and tycoon:FindFirstChild("Buttons") then
+            for _, button in pairs(tycoon.Buttons:GetChildren()) do
+                if button:FindFirstChild("Click") then
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, button, 0)
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, button, 1)
                 end
             end
         end
-        target = richestPlayer
-    else
-        -- Steal from random player
-        local validPlayers = {}
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                table.insert(validPlayers, player)
+    end
+end
+
+-- Auto-Rebirth Function
+local function autoRebirth()
+    while AUTO_REBIRTH and task.wait(5) do
+        if LocalPlayer:FindFirstChild("Level") and LocalPlayer.Level.Value >= REBIRTH_AT then
+            ReplicatedStorage.Rebirth:FireServer()
+        end
+    end
+end
+
+-- Auto-Buy Upgrades
+local function autoBuyUpgrades()
+    while AUTO_BUY_UPGRADES and task.wait(3) do
+        local tycoon = getYourTycoon()
+        if tycoon and tycoon:FindFirstChild("Upgrades") then
+            for _, upgrade in pairs(tycoon.Upgrades:GetChildren()) do
+                if upgrade:FindFirstChild("Click") then
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, upgrade, 0)
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, upgrade, 1)
+                end
             end
         end
-        target = validPlayers[math.random(#validPlayers)]
-    end
-
-    if target then
-        game:GetService("ReplicatedStorage").StealTime:FireServer(target)
     end
 end
 
--- Auto-Upgrade Function
-local function upgradeStats()
-    local reborn = LocalPlayer:FindFirstChild("Reborns") and LocalPlayer.Reborns.Value or 0
-    if reborn >= 5 then
-        game:GetService("ReplicatedStorage").Reborn:FireServer()
-    else
-        game:GetService("ReplicatedStorage").Upgrade:FireServer("Speed")
-        game:GetService("ReplicatedStorage").Upgrade:FireServer("StealAmount")
-    end
-end
+-- Start All Functions
+coroutine.wrap(autoClick)()
+coroutine.wrap(autoRebirth)()
+coroutine.wrap(autoBuyUpgrades)()
 
--- Main Loop
-RunService.Heartbeat:Connect(function()
-    if AUTO_STEAL then
-        stealTime()
-        wait(STEAL_DELAY)
-    end
-    if AUTO_UPGRADE then
-        upgradeStats()
-    end
-end)
-
--- GUI Toggle
+-- GUI (Press Right Shift to toggle)
+local UIS = game:GetService("UserInputService")
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Steal Time Hacks", "DarkTheme")
+local Window = Library.CreateLib("Elemental Power Tycoon Hacks", "DarkTheme")
 
-local MainTab = Window:NewTab("Main")
-local AutoFarmSection = MainTab:NewSection("Auto Farm")
+local Main = Window:NewTab("Main")
+local AutoFarm = Main:NewSection("Auto Farm")
 
-AutoFarmSection:NewToggle("Auto Steal Time", "Steals automatically", function(state)
-    AUTO_STEAL = state
+AutoFarm:NewToggle("Auto-Click", "Automatically clicks buttons", function(state)
+    AUTO_FARM = state
+    if state then coroutine.wrap(autoClick)() end
 end)
 
-AutoFarmSection:NewToggle("Auto Upgrade", "Upgrades automatically", function(state)
-    AUTO_UPGRADE = state
+AutoFarm:NewToggle("Auto-Rebirth", "Auto rebirth at set level", function(state)
+    AUTO_REBIRTH = state
+    if state then coroutine.wrap(autoRebirth)() end
 end)
 
-AutoFarmSection:NewSlider("Steal Delay", "Seconds between steals", 5, 0.1, function(value)
-    STEAL_DELAY = value
+AutoFarm:NewToggle("Auto-Upgrades", "Buys all upgrades automatically", function(state)
+    AUTO_BUY_UPGRADES = state
+    if state then coroutine.wrap(autoBuyUpgrades)() end
 end)
 
-AutoFarmSection:NewToggle("Target Richest", "Steals from richest players", function(state)
-    TARGET_RICHEST = state
+AutoFarm:NewSlider("Click Speed", "Lower = faster", 2, 0.1, function(value)
+    FARM_SPEED = value
+end)
+
+AutoFarm:NewTextBox("Rebirth At Level", "Set rebirth level", function(text)
+    REBIRTH_AT = tonumber(text) or 10
 end)
