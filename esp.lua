@@ -4,38 +4,41 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local camera = game.Workspace.CurrentCamera
 
-local function drawRay(player)
+local function drawLookAtLine(player)
     local character = player.Character
     if not character then return end
 
-    -- Get the position of the head or HumanoidRootPart
-    local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    -- Get the position of the head
+    local head = character:FindFirstChild("Head")
     if not head then return end
 
-    -- Create the ray in the direction the player is looking
-    local direction = (camera.CFrame.LookVector * 1000)  -- Ray direction (long distance)
-    local origin = head.Position + Vector3.new(0, 1, 0)  -- Start point (above the player's head)
-    
-    -- Create a part to represent the ray
-    local rayPart = Instance.new("Part")
-    rayPart.Size = Vector3.new(0.2, 0.2, direction.Magnitude)
-    rayPart.CFrame = CFrame.new(origin, origin + direction)
-    rayPart.Anchored = true
-    rayPart.CanCollide = false
-    rayPart.Material = Enum.Material.Neon
-    rayPart.BrickColor = BrickColor.new("Bright blue")
-    rayPart.Transparency = 0.5
-    rayPart.Parent = workspace
+    -- Create the direction vector (where the player is looking)
+    local lookDirection = head.CFrame.LookVector
+    local lineLength = 50 -- Length of the "stick"
 
-    -- Destroy the ray part after 1 second
-    game.Debris:AddItem(rayPart, 1)
+    -- Calculate the end position for the line (lookDirection * lineLength)
+    local endPos = head.Position + lookDirection * lineLength
+
+    -- Create a part to represent the line
+    local linePart = Instance.new("Part")
+    linePart.Size = Vector3.new(0.2, 0.2, lineLength)
+    linePart.CFrame = CFrame.new(head.Position, endPos)
+    linePart.Anchored = true
+    linePart.CanCollide = false
+    linePart.Material = Enum.Material.SmoothPlastic
+    linePart.BrickColor = BrickColor.new("Bright green")
+    linePart.Transparency = 0.6
+    linePart.Parent = workspace
+
+    -- Destroy the line after a short time
+    game.Debris:AddItem(linePart, 0.1)
 end
 
 -- Continuously check where each player is looking
 RunService.Heartbeat:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            drawRay(player)
+            drawLookAtLine(player)
         end
     end
 end)
