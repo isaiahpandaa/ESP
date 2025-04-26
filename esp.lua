@@ -1,104 +1,76 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Teams = game:GetService("Teams") -- Added team check
+local Workspace = game:GetService("Workspace")
 
--- Settings
-local LINE_LENGTH = 30
-local LINE_THICKNESS = 0.15
-local LINE_COLOR = Color3.fromRGB(255, 50, 50) -- Red for enemies
-local LINE_TRANSPARENCY = 0.5
-local UPDATE_RATE = 0.1
+-- CONFIG --
+local PREDICTION_COLOR = Color3.fromRGB(255, 0, 0) -- Red marker
+local PREDICTION_SIZE = Vector3.new(4, 0.2, 4) -- Width, Height, Length
+local PREDICTION_TRANSPARENCY = 0.5 -- 0 = Solid, 1 = Invisible
+local MAX_PREDICTION_TIME = 3 -- Seconds ahead to predict
+local UPDATE_RATE = 0.05 -- How often it updates (lower = smoother)
 
--- Store lines per player
-local lineCache = {}
+-- Find the ball (adjust name if needed)
+local ball = Workspace:FindFirstChild("Ball") or Workspace:WaitForChild("Ball")
 
-local function isOpponent(player)
-    if not LocalPlayer.Team then return true end -- If no teams, show all
-    return player.Team ~= LocalPlayer.Team
-end
+-- Create the prediction marker
+local marker = Instance.new("Part")
+marker.Name = "BallPrediction"
+marker.Anchored = true
+marker.CanCollide = false
+marker.Size = PREDICTION_SIZE
+marker.Color = PREDICTION_COLOR
+marker.Transparency = PREDICTION_TRANSPARENCY
+marker.Material = Enum.Material.Neon
+marker.Shape = Enum.PartType.Block
+marker.Parent = Workspace
 
-local function createBeam(player)
-    local character = player.Character
-    if not character then return nil end
+-- Advanced trajectory calculation
+local function calculateLandingPosition()
+    if not ball or not ball:IsDescendantOf(Workspace) then return nil end
     
-    local head = character:FindFirstChild("Head")
-    if not head then return nil end
-
-    local attachment0 = Instance.new("Attachment")
-    local attachment1 = Instance.new("Attachment")
-    local beam = Instance.new("Beam")
-
-    attachment0.Parent = head
-    attachment1.Parent = head
-
-    beam.Attachment0 = attachment0
-    beam.Attachment1 = attachment1
-    beam.Width0 = LINE_THICKNESS
-    beam.Width1 = LINE_THICKNESS
-    beam.Color = ColorSequence.new(LINE_COLOR)
-    beam.Transparency = NumberSequence.new(LINE_TRANSPARENCY)
-    beam.LightEmission = 1
-    beam.Parent = head
-
-    return {
-        beam = beam,
-        attachment0 = attachment0,
-        attachment1 = attachment1
-    }
-end
-
-local function updateBeam(player, beamData)
-    if not isOpponent(player) then
-        beamData.beam.Enabled = false
-        return
-    end
-
-    local character = player.Character
-    if not character then return end
+    local velocity = ball.Velocity
+    local position = ball.Position
+    local gravity = Workspace.Gravity
     
-    local head = character:FindFirstChild("Head")
-    if not head then return end
-
-    beamData.beam.Enabled = true
-    local lookDir = head.CFrame.LookVector
-    local startPos = head.Position + (lookDir * 1)
-    local endPos = startPos + (lookDir * LINE_LENGTH)
-
-    beamData.attachment0.WorldPosition = startPos
-    beamData.attachment1.WorldPosition = endPos
+    -- Ignore if ball isn't moving
+    if velocity.Magnitude < 1 then return nil end
+    
+    -- Calculate time until ball hits ground (quadratic formula)
+    local a = 0.5 * gravity
+    local b = velocity.Y
+    local c = position.Y - marker.Size.Y/2
+    local discriminant = b^2 - 4*a*c
+    
+    if discriminant < 0 then return nil end -- Ball won't hit ground
+    
+    local t = (-b - math.sqrt(discriminant)) / (2 * a)
+    t = math.clamp(t, 0, MAX_PREDICTION_TIME)
+    
+    -- Calculate landing position (X and Z movement)
+    local landingPos = position + velocity * t + Vector3.new(0, 0.1, 0)
+    return landingPos
 end
 
--- Main loop
-RunService.Heartbeat:Connect(function()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player == LocalPlayer then continue end
-
-        if not lineCache[player] then
-            lineCache[player] = createBeam(player)
-        end
-
-        if lineCache[player] then
-            updateBeam(player, lineCache[player])
-        end
+-- Smooth updates
+local lastUpdate = 0
+RunService.Heartbeat:Connect(function(deltaTime)
+    lastUpdate = lastUpdate + deltaTime
+    if lastUpdate < UPDATE_RATE then return end
+    lastUpdate = 0
+    
+    local landingPos = calculateLandingPosition()
+    if landingPos then
+        marker.Position = landingPos
+        marker.Transparency = PREDICTION_TRANSPARENCY
+    else
+        marker.Transparency = 1 -- Hide when not applicable
     end
 end)
 
--- Cleanup
-Players.PlayerRemoving:Connect(function(player)
-    if lineCache[player] then
-        lineCache[player].beam:Destroy()
-        lineCache[player].attachment0:Destroy()
-        lineCache[player].attachment1:Destroy()
-        lineCache[player] = nil
-    end
-end)
-
--- Handle team changes
-LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
-    for player, beamData in pairs(lineCache) do
-        if player and beamData then
-            updateBeam(player, beamData)
-        end
+-- Cleanup when script ends
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.P then -- Press P to toggle
+        marker.Transparency = marker.Transparency == 1 and PREDICTION_TRANSPARENCY or 1
     end
 end)
