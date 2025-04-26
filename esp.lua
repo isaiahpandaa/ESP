@@ -2,45 +2,40 @@ loadstring([[
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local camera = game.Workspace.CurrentCamera
 
-local function createESP(player)
+local function drawRay(player)
     local character = player.Character
     if not character then return end
 
-    -- Create the ESP part and position it slightly above the character
-    local espBox = Instance.new("Part")
-    espBox.Size = character:FindFirstChild("HumanoidRootPart").Size + Vector3.new(1, 2, 1)
-    espBox.Position = character:FindFirstChild("HumanoidRootPart").Position + Vector3.new(0, 3, 0)
-    espBox.Anchored = true
-    espBox.CanCollide = false
-    espBox.Material = Enum.Material.SmoothPlastic
-    espBox.BrickColor = BrickColor.new("Bright red")
-    espBox.Transparency = 0.5
-    espBox.Parent = workspace
+    -- Get the position of the head or HumanoidRootPart
+    local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    if not head then return end
 
-    -- Create the BillboardGui for the name label
-    local billboard = Instance.new("BillboardGui")
-    billboard.Parent = espBox
-    billboard.Adornee = espBox
-    billboard.Size = UDim2.new(0, 200, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    -- Create the ray in the direction the player is looking
+    local direction = (camera.CFrame.LookVector * 1000)  -- Ray direction (long distance)
+    local origin = head.Position + Vector3.new(0, 1, 0)  -- Start point (above the player's head)
+    
+    -- Create a part to represent the ray
+    local rayPart = Instance.new("Part")
+    rayPart.Size = Vector3.new(0.2, 0.2, direction.Magnitude)
+    rayPart.CFrame = CFrame.new(origin, origin + direction)
+    rayPart.Anchored = true
+    rayPart.CanCollide = false
+    rayPart.Material = Enum.Material.Neon
+    rayPart.BrickColor = BrickColor.new("Bright blue")
+    rayPart.Transparency = 0.5
+    rayPart.Parent = workspace
 
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Parent = billboard
-    nameLabel.Text = player.Name
-    nameLabel.TextSize = 18
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameLabel.BackgroundTransparency = 1
+    -- Destroy the ray part after 1 second
+    game.Debris:AddItem(rayPart, 1)
 end
 
--- Update ESP for each player every frame
+-- Continuously check where each player is looking
 RunService.Heartbeat:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            -- Only create the ESP if it doesn't already exist
-            if not player.Character:FindFirstChild("ESP_Box") then
-                createESP(player)
-            end
+            drawRay(player)
         end
     end
 end)
