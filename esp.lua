@@ -1,4 +1,4 @@
--- Simple ESP Script
+loadstring([[
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
@@ -9,17 +9,17 @@ local function createESP(player)
 
     local espBox = Instance.new("Part")
     espBox.Size = character:FindFirstChild("HumanoidRootPart").Size + Vector3.new(1, 2, 1)
-    espBox.Position = character:FindFirstChild("HumanoidRootPart").Position
+    espBox.Position = character:FindFirstChild("HumanoidRootPart").Position + Vector3.new(0, 3, 0)  -- Adjust to position above the player
     espBox.Anchored = true
     espBox.CanCollide = false
     espBox.Material = Enum.Material.SmoothPlastic
     espBox.BrickColor = BrickColor.new("Bright red")
     espBox.Transparency = 0.5
-    espBox.Parent = character
+    espBox.Parent = workspace -- Keep the box in the workspace
 
     local billboard = Instance.new("BillboardGui")
     billboard.Parent = espBox
-    billboard.Adornee = character:FindFirstChild("HumanoidRootPart")
+    billboard.Adornee = espBox
     billboard.Size = UDim2.new(0, 200, 0, 50)
     billboard.StudsOffset = Vector3.new(0, 3, 0)
 
@@ -40,3 +40,4 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+]])()
