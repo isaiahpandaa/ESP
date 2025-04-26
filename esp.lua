@@ -1,18 +1,25 @@
--- Elemental Power Tycoon OP Auto-Farm Script
+-- Elemental Power Tycoon ULTIMATE Auto-Farm
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
--- Auto-Farm Settings
-local AUTO_FARM = true
-local AUTO_REBIRTH = true
-local AUTO_BUY_UPGRADES = true
-local FARM_SPEED = 0.5 -- Seconds between clicks (lower = faster)
-local REBIRTH_AT = 10 -- Rebirth when you reach this level
+-- Settings
+local settings = {
+    AutoFarm = true,
+    AutoRebirth = true,
+    AutoUpgrades = true,
+    AutoOrbs = true,
+    FarmDelay = 0.3,
+    RebirthAt = 10
+}
 
--- Find your Tycoon
-local function getYourTycoon()
+-- Load GUI Library
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Elemental Power Tycoon", "DarkTheme")
+
+-- Improved Tycoon Finder
+local function getTycoon()
     for _, tycoon in pairs(Workspace.Tycoons:GetChildren()) do
         if tycoon:FindFirstChild("Owner") and tycoon.Owner.Value == LocalPlayer then
             return tycoon
@@ -20,77 +27,96 @@ local function getYourTycoon()
     end
 end
 
--- Auto-Click Function
-local function autoClick()
-    while AUTO_FARM and task.wait(FARM_SPEED) do
-        local tycoon = getYourTycoon()
-        if tycoon and tycoon:FindFirstChild("Buttons") then
-            for _, button in pairs(tycoon.Buttons:GetChildren()) do
-                if button:FindFirstChild("Click") then
-                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, button, 0)
-                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, button, 1)
+-- Fixed Click Function
+local function clickButton(button)
+    pcall(function()
+        if button:FindFirstChild("Click") then
+            ReplicatedStorage.Click:FireServer(button)
+        end
+    end)
+end
+
+-- Main Farm Function
+local function autoFarm()
+    while settings.AutoFarm and task.wait(settings.FarmDelay) do
+        local tycoon = getTycoon()
+        if tycoon then
+            -- Click money buttons
+            for _, button in pairs(tycoon.Buttons:GetDescendants()) do
+                if button.Name == "Click" then
+                    clickButton(button.Parent)
+                end
+            end
+            
+            -- Buy upgrades
+            if settings.AutoUpgrades then
+                for _, upgrade in pairs(tycoon.Upgrades:GetDescendants()) do
+                    if upgrade.Name == "Click" then
+                        clickButton(upgrade.Parent)
+                    end
                 end
             end
         end
     end
 end
 
--- Auto-Rebirth Function
+-- Auto-Rebirth
 local function autoRebirth()
-    while AUTO_REBIRTH and task.wait(5) do
-        if LocalPlayer:FindFirstChild("Level") and LocalPlayer.Level.Value >= REBIRTH_AT then
-            ReplicatedStorage.Rebirth:FireServer()
+    while settings.AutoRebirth and task.wait(5) do
+        if LocalPlayer:FindFirstChild("Level") and LocalPlayer.Level.Value >= settings.RebirthAt then
+            pcall(function()
+                ReplicatedStorage.Rebirth:FireServer()
+            end)
         end
     end
 end
 
--- Auto-Buy Upgrades
-local function autoBuyUpgrades()
-    while AUTO_BUY_UPGRADES and task.wait(3) do
-        local tycoon = getYourTycoon()
-        if tycoon and tycoon:FindFirstChild("Upgrades") then
-            for _, upgrade in pairs(tycoon.Upgrades:GetChildren()) do
-                if upgrade:FindFirstChild("Click") then
-                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, upgrade, 0)
-                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, upgrade, 1)
+-- Auto-Collect Orbs
+local function collectOrbs()
+    while settings.AutoOrbs and task.wait(0.5) do
+        pcall(function()
+            for _, orb in pairs(Workspace:GetDescendants()) do
+                if orb.Name:find("Orb") and orb:IsA("BasePart") then
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, orb, 0)
+                    firetouchinterest(LocalPlayer.Character.HumanoidRootPart, orb, 1)
                 end
             end
-        end
+        end)
     end
 end
 
--- Start All Functions
-coroutine.wrap(autoClick)()
-coroutine.wrap(autoRebirth)()
-coroutine.wrap(autoBuyUpgrades)()
+-- GUI Setup
+local MainTab = Window:NewTab("Main")
+local FarmSection = MainTab:NewSection("Auto Farm")
 
--- GUI (Press Right Shift to toggle)
-local UIS = game:GetService("UserInputService")
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Elemental Power Tycoon Hacks", "DarkTheme")
-
-local Main = Window:NewTab("Main")
-local AutoFarm = Main:NewSection("Auto Farm")
-
-AutoFarm:NewToggle("Auto-Click", "Automatically clicks buttons", function(state)
-    AUTO_FARM = state
-    if state then coroutine.wrap(autoClick)() end
+FarmSection:NewToggle("Auto-Farm", "Automatically clicks buttons", function(state)
+    settings.AutoFarm = state
+    if state then coroutine.wrap(autoFarm)() end
 end)
 
-AutoFarm:NewToggle("Auto-Rebirth", "Auto rebirth at set level", function(state)
-    AUTO_REBIRTH = state
+FarmSection:NewToggle("Auto-Upgrades", "Buys upgrades automatically", function(state)
+    settings.AutoUpgrades = state
+end)
+
+FarmSection:NewToggle("Auto-Rebirth", "Rebirths at set level", function(state)
+    settings.AutoRebirth = state
     if state then coroutine.wrap(autoRebirth)() end
 end)
 
-AutoFarm:NewToggle("Auto-Upgrades", "Buys all upgrades automatically", function(state)
-    AUTO_BUY_UPGRADES = state
-    if state then coroutine.wrap(autoBuyUpgrades)() end
+FarmSection:NewToggle("Auto-Orbs", "Collects all orbs", function(state)
+    settings.AutoOrbs = state
+    if state then coroutine.wrap(collectOrbs)() end
 end)
 
-AutoFarm:NewSlider("Click Speed", "Lower = faster", 2, 0.1, function(value)
-    FARM_SPEED = value
+FarmSection:NewSlider("Click Speed", "Lower = faster", 1, 0.1, function(value)
+    settings.FarmDelay = value
 end)
 
-AutoFarm:NewTextBox("Rebirth At Level", "Set rebirth level", function(text)
-    REBIRTH_AT = tonumber(text) or 10
+FarmSection:NewTextBox("Rebirth At Level", "Set rebirth level", function(text)
+    settings.RebirthAt = tonumber(text) or 10
 end)
+
+-- Start all functions
+coroutine.wrap(autoFarm)()
+coroutine.wrap(autoRebirth)()
+coroutine.wrap(collectOrbs)()
